@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Dashboard</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        canvas {
+            width: 100% !important;
+            height: auto !important;
+        }
+    </style>
+    <script>
+        let lastAlert = '';
+        let phoneAlertActive = false;
+        let handAlertActive = false;
+        let blinkAlertActive = false;
+
+        let distractionChart, mouthChart, blinkChart, phoneChart;
+
+        function initCharts() {
+            distractionChart = new Chart(document.getElementById('distractionChart'), {
+                type: 'bar',
+                data: {
+                    labels: ['Distraction Time'],
+                    datasets: [{
+                        label: 'Seconds',
+                        data: [0],
+                        backgroundColor: '#ff6384'
+                    }]
+                },
+                options: { scales: { y: { beginAtZero: true } }, responsive: true }
+            });
+
+            mouthChart = new Chart(document.getElementById('mouthChart'), {
+                type: 'bar',
+                data: {
+                    labels: ['Hand on Mouth'],
+                    datasets: [{
+                        label: 'Count',
+                        data: [0],
+                        backgroundColor: '#36a2eb'
+                    }]
+                },
+                options: { scales: { y: { beginAtZero: true } }, responsive: true }
+            });
+
+            blinkChart = new Chart(document.getElementById('blinkChart'), {
+                type: 'bar',
+                data: {
+                    labels: ['Blink Count'],
+                    datasets: [{
+                        label: 'Count',
+                        data: [0],
+                        backgroundColor: '#ffcd56'
+                    }]
+                },
+                options: { scales: { y: { beginAtZero: true } }, responsive: true }
+            });
+
+            phoneChart = new Chart(document.getElementById('phoneChart'), {
+                type: 'bar',
+                data: {
+                    labels: ['Phone Usage'],
+                    datasets: [{
+                        label: 'Seconds',
+                        data: [0],
+                        backgroundColor: '#4bc0c0'
+                    }]
+                },
+                options: { scales: { y: { beginAtZero: true } }, responsive: true }
+            });
+        }
+
+        function updateCharts(data) {
+            distractionChart.data.datasets[0].data[0] = data.distraction_time || 0;
+            mouthChart.data.datasets[0].data[0] = data.hand_on_mouth_count || 0;
+            blinkChart.data.datasets[0].data[0] = data.blink_count || 0;
+            phoneChart.data.datasets[0].data[0] = data.total_phone_usage_time || 0;
+
+            distractionChart.update();
+            mouthChart.update();
+            blinkChart.update();
+            phoneChart.update();
+        }
+
+        function showToast(message) {
+            $('#toastMessage').text(message);
+            $('#alertToast').toast('show');
+        }
+
+        function fetchDashboardData() {
+            $.getJSON('/user_dashboard/data', function(data) {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                // Update values
+                $('#distraction_time').text(data.distraction_time + ' seconds');
+                $('#hand_on_mouth_count').text(data.hand_on_mouth_count);
+                $('#blink_count').text(data.blink_count);
+                $('#total_phone_usage_time').text(data.total_phone_usage_time + ' seconds');
+
+                // Update charts
+                updateCharts(data);
+
+                // Posture alerts
+                if (data.posture_alerts.length > 0) {
+                    let latestAlert = data.posture_alerts[data.posture_alerts.length - 1];
+                    if (latestAlert !== lastAlert) {
+                        $('#posture_alerts').html('<li>' + latestAlert + '</li>');
+                        showToast("Fix your posture!");
+                        lastAlert = latestAlert;
+                    }
+                } else {
+                    $('#posture_alerts').html('<li>No alerts recorded.</li>');
+                }
+
+                // Handle alerts for multiple conditions independently
+                if (data.total_phone_usage_time >= 10 && !phoneAlertActive) {
+                    showToast("You’ve been on your phone too long!");
+                    phoneAlertActive = true;
+                } else if (data.total_phone_usage_time < 10) {
+                    phoneAlertActive = false;
+                }
+
+                if (data.hand_on_mouth_count >= 5 && !handAlertActive) {
+                    showToast("You seem tired. Get a coffee or talk to your manager.");
+                    handAlertActive = true;
+                } else if (data.hand_on_mouth_count < 5) {
+                    handAlertActive = false;
+                }
+
+                if (data.blink_count >= 3 && !blinkAlertActive) {
+                    showToast("Your eyes seem tired. Take a 5-minute break.");
+                    blinkAlertActive = true;
+                } else if (data.blink_count < 3) {
+                    blinkAlertActive = false;
+                }
+            });
+        }
+
+        $(document).ready(function() {
+            initCharts();
+            fetchDashboardData();
+            setInterval(fetchDashboardData, 5000);
+        });
+    </script>
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="text-center mb-4">
+            <h2>User Dashboard</h2>
+            <p>Welcome, <strong>{{ username }}</strong></p>
+        </div>
+
+        <div class="row">
+            <!-- Left Column: Dashboard Overview -->
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <strong>Dashboard Overview</strong>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group">
+                            <li class="list-group-item">
+                                <strong>Distraction Time:</strong> <span id="distraction_time">Loading...</span>
+                            </li>
+                            <li class="list-group-item">
+                                <strong>Hand on Mouth Count:</strong> <span id="hand_on_mouth_count">Loading...</span>
+                            </li>
+                            <li class="list-group-item">
+                                <strong>Blink Count:</strong> <span id="blink_count">Loading...</span>
+                            </li>
+                            <li class="list-group-item">
+                                <strong>Phone Usage Time:</strong> <span id="total_phone_usage_time">Loading...</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Posture Alerts -->
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <strong>Posture Alerts</strong>
+                    </div>
+                    <div class="card-body">
+                        <ul id="posture_alerts" class="list-group">
+                            <li class="list-group-item">Loading...</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row for Charts -->
+        <div class="card mb-5">
+            <div class="card-header">
+                <strong>Live Metric Charts</strong>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 text-center">
+                        <canvas id="distractionChart"></canvas>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <canvas id="mouthChart"></canvas>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <canvas id="blinkChart"></canvas>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <canvas id="phoneChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logout Button -->
+        <div class="text-center mt-4">
+            <a href="{{ url_for('logout') }}" class="btn btn-danger">Logout</a>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div aria-live="polite" aria-atomic="true" style="position: fixed; top: 20px; right: 20px; z-index: 9999;">
+        <div id="alertToast" class="toast" data-delay="5000">
+            <div class="toast-header bg-warning text-dark">
+                <strong class="mr-auto">Notice</strong>
+                <button type="button" class="ml-2 mb-1 close" data-dismiss="toast">&times;</button>
+            </div>
+            <div class="toast-body" id="toastMessage">
+                <!-- Message goes here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

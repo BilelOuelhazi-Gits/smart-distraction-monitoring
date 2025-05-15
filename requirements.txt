@@ -1,0 +1,11 @@
+# Flask app dependencies
+Flask>=2.3.2
+Flask-PyMongo>=2.3.0
+Werkzeug>=2.3.4
+pymongo>=4.3.3
+
+
+# OpenCV and computer vision dependencies
+opencv-python>=4.7.0.72
+mediapipe>=0.9.1.0
+numpy>=1.24.3
